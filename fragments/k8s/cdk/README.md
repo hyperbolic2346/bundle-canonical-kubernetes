@@ -432,7 +432,7 @@ to determine fault tolerance.
 
 # Adding optional storage
 
-Using [Juju Storage](https://jujucharms.com/docs/2.0/charms-storage), the
+Using [Juju Storage](https://docs.jujucharms.com/charms-storage), the
 Canonical Distribution of Kubernetes allows you to connect with durable
 storage devices such as [Ceph](https://ceph.com).
 
@@ -440,7 +440,7 @@ Deploy a minimum of three ceph-mon and three ceph-osd charms:
 ```
 juju deploy cs:ceph-mon -n 3
 juju deploy cs:ceph-osd -n 3
-```
+```  
 
 Relate the charms:
 ```
@@ -475,15 +475,24 @@ Next relate the storage cluster with the Kubernetes cluster:
 juju add-relation kubernetes-master ceph-mon
 ```
 
-We are now ready to enlist
-[Persistent Volumes](https://kubernetes.io/docs/user-guide/persistent-volumes/)
-in Kubernetes, which our workloads can use via Persistent Volume Claims (PVC).
+We are now ready to make
+[Persistent Volume Claims](https://kubernetes.io/docs/user-guide/persistent-volumes/)
+in Kubernetes, which our workloads can use.
 
 ```
-juju run-action kubernetes-master/0 create-rbd-pv name=test size=50
+cat <<EOF | kubectl create -f -
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+EOF
 ```
-
-This example created a "test" Radios Block Device (rbd) in the size of 50 MB.
 
 You should see the PV become enlisted and be marked as available:
 ```
@@ -491,14 +500,18 @@ $ watch kubectl get pv
 
 NAME CAPACITY   ACCESSMODES   STATUS    CLAIM              REASON    AGE
 
-test   50M          RWO       Available                              10s
+myclaim   8G          RWO       Available                              10s
 ```
 
-To consume these Persistent Volumes, your pods will need a
-Persistent Volume Claim associated with
-them, a task that is outside the scope of this README. See the
-[Persistent Volumes](https://kubernetes.io/docs/user-guide/persistent-volumes/)
-documentation for more information.
+You can specify no storage class and get the default storage class. This default can be
+configured with
+```
+juju config kubernetes-master default-storage="ceph-ext4"
+```
+
+The default value is auto and currently selects ceph-xfs if ceph is related to
+kubernetes-master.
+
 
 ## Known Limitations and Issues
 
